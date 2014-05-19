@@ -171,9 +171,7 @@ public class SignatureEntry extends WssEntryBase {
 
             // default is
             // http://ws.apache.org/wss4j/apidocs/org/apache/ws/security/WSConstants.html#ISSUER_SERIAL
-            if (keyIdentifierType != 0) {
-                wssSign.setKeyIdentifierType(keyIdentifierType);
-            }
+            wssSign.setKeyIdentifierType(keyIdentifierType);
 
             if (StringUtils.hasContent(signatureAlgorithm) && !signatureAlgorithm.equals(DEFAULT_OPTION)) {
                 wssSign.setSignatureAlgorithm(signatureAlgorithm);
