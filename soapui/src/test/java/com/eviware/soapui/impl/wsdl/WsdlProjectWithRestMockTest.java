@@ -113,24 +113,6 @@ public class WsdlProjectWithRestMockTest {
         assertThat(mockServiceX.getMockOperationAt(1).getName(), is("a"));
     }
 
-    @Test
-    public void projectsCreatedFromInputStreamCanBeSavedSuccessfully() throws IOException {
-        InputStream inputStream = SoapUI.class.getResourceAsStream(TEST_PROJECT_PATH);
-        WsdlProject projectFromStream = new WsdlProject(inputStream, null);
-        SaveStatus saveStatus = projectFromStream.save();
-
-        assertThat(saveStatus, is(SaveStatus.SUCCESS));
-    }
-
-    @Ignore
-    @Test
-    public void projectsCreatedFromInputStreamHaveNullPath() {
-        InputStream inputStream = null;
-        WsdlProject wsdlProject = new WsdlProject(inputStream, null);
-
-        assertThat(project.getPath(), is(nullValue()));
-    }
-
     private void addRestMockResponseToProject() throws SoapUIException {
         RestMockService restMockService = project.addNewRestMockService(restMockServiceName);
         RestRequest restRequest = ModelItemFactory.makeRestRequest();

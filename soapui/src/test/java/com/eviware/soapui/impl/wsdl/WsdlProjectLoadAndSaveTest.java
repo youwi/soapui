@@ -53,6 +53,17 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
     }
 
     @Test
+    public void projectIsNotSavedIfSaveAsDialogIsCancelled() throws IOException {
+        Project project = new WsdlProject(sampleProjectInputSteam, null);
+
+        // The file exists do you want to overwrite? - Yes
+        stubbedDialogs.mockConfirmWithReturnValue(true);
+        when(mockedFileDialogs.saveAs(anyObject(), anyString(), anyString(), anyString(), isA(File.class))).thenReturn(null);
+        SaveStatus status = project.save();
+        assertThat(status, is(SaveStatus.CANCELLED));
+    }
+
+    @Test
     public void projectLoadedFromInputStreamCanBeSaved() throws IOException {
         Project project = new WsdlProject(sampleProjectInputSteam, null);
 
@@ -92,27 +103,43 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
     }
 
     @Test
-    public void newlyCreatedProjectIsNotSavedIfSaveAsProjectFileIsNotWritable() throws IOException {
+    public void doNotSaveExistingFileIfNotWritableAndWeDontWantToSave() throws IOException {
         String projectFilePath = getClass().getResource(SAMPLE_PROJECT_PATH).getPath();
+        setFileWritePermission(projectFilePath, false);
         Project project = new WsdlProject(projectFilePath, (WorkspaceImpl) null);
-        boolean couldSetWritable = new File(projectFilePath).setWritable(false);
-        if (!couldSetWritable) {
-            throw new IOException("Can't set sample project file to writable");
-        } else {
-            // Could not save file. Do you want to write to a new file? - No
-            stubbedDialogs.mockConfirmWithReturnValue(false);
-            SaveStatus status = project.save();
-            assertThat(status, is(SaveStatus.DONT_SAVE));
-        }
+
+        // Could not save file. Do you want to write to a new file? - No
+        stubbedDialogs.mockConfirmWithReturnValue(false);
+        SaveStatus status = project.save();
+        assertThat(status, is(SaveStatus.DONT_SAVE));
+    }
+
+    // FIXME Fill in remaining tests and then remove WsdlProjectTest
+
+    @Ignore
+    @Test
+    public void cancelSaveOfExistingFileIfNotWritableAndNoNewFileSelected() {
+    }
+
+    @Ignore
+    @Test
+    public void shouldBePossibleToCancelIfFileIsNotWritable() {
+    }
+
+    @Ignore
+    @Test
+    public void confirmIfTryingToOverwriteExistingFile() {
+    }
+
+    @Ignore
+    @Test
+    public void askForNewFileNameIfSelectedFileIsNotWritable() {
     }
 
 
     private void resetSampleProjectToWritable() throws IOException {
         String projectFilePath = getClass().getResource(SAMPLE_PROJECT_PATH).getPath();
-        boolean couldSetWritable = new File(projectFilePath).setWritable(true);
-        if (!couldSetWritable) {
-            throw new IOException("Can't set sample project file to writable");
-        }
+        setFileWritePermission(projectFilePath, true);
     }
 
     private void resetStubbedDialogs() {
@@ -128,5 +155,12 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
         WsdlProject project = new WsdlProject();
         project.setName(PROJECT_NAME);
         return project;
+    }
+
+    private void setFileWritePermission(String projectFilePath, boolean writable) throws IOException {
+        boolean couldSetWritable = new File(projectFilePath).setWritable(writable);
+        if (!couldSetWritable) {
+            throw new IOException("Can't set project file '" + projectFilePath + "' to writable");
+        }
     }
 }
