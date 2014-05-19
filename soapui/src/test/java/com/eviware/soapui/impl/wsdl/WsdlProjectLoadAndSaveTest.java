@@ -1,5 +1,6 @@
 package com.eviware.soapui.impl.wsdl;
 
+import com.eviware.soapui.impl.*;
 import com.eviware.soapui.model.project.Project;
 import com.eviware.soapui.model.project.SaveStatus;
 import com.eviware.soapui.support.SoapUIException;
@@ -7,9 +8,8 @@ import com.eviware.soapui.utils.StubbedDialogsTestBase;
 import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.xmlbeans.XmlException;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.mockito.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,8 +19,8 @@ import java.util.UUID;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.*;
 
 public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
 
@@ -37,12 +37,12 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
         resetStubbedDialogs();
     }
 
-    @After
-    public void cleanUpTemporaryFiles() throws IOException {
+    @AfterClass
+    public static void cleanUpTemporaryFiles() throws IOException {
         FileUtils.deleteDirectory(TEMPORARY_FOLDER);
     }
 
-    /*@Test
+    @Test
     public void userIsPromptedForSaveLocationWhenSavingProjectLoadedFromInputStream() throws IOException {
         Project project = new WsdlProject(sampleProjectInputSteam, null);
 
@@ -50,7 +50,7 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
         stubbedDialogs.mockConfirmWithReturnValue(true);
         project.save();
         verify(mockedFileDialogs).saveAs(anyObject(), anyString(), anyString(), anyString(), isA(File.class));
-    }*/
+    }
 
     @Test
     public void projectLoadedFromInputStreamCanBeSaved() throws IOException {
@@ -62,7 +62,7 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
         assertThat(status, is(SaveStatus.SUCCESS));
     }
 
- /*   @Test
+    @Test
     public void projectLoadedFromFileCanBeSaved() throws IOException {
         String projectFilePath = getClass().getResource(SAMPLE_PROJECT_PATH).getPath();
         Project project = new WsdlProject(projectFilePath, (WorkspaceImpl) null);
@@ -70,7 +70,7 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
         SaveStatus status = project.save();
         assertThat(status, is(SaveStatus.SUCCESS));
     }
-*/
+
     @Test
     public void newlyCreatedProjectCanBeSaved() throws XmlException, IOException, SoapUIException {
         WsdlProject project = createTemporaryProject();
@@ -79,7 +79,7 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
         assertThat(status, is(SaveStatus.SUCCESS));
     }
 
- /*   @Test
+    @Test
     public void newlyCreatedProjectIsNotSavedIfUserOptsNotToSave() throws XmlException, IOException, SoapUIException {
         Project project = createTemporaryProject();
 
@@ -104,7 +104,7 @@ public class WsdlProjectLoadAndSaveTest extends StubbedDialogsTestBase {
             SaveStatus status = project.save();
             assertThat(status, is(SaveStatus.DONT_SAVE));
         }
-    }*/
+    }
 
 
     private void resetSampleProjectToWritable() throws IOException {
