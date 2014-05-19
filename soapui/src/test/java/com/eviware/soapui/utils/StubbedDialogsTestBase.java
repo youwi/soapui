@@ -21,55 +21,55 @@ import com.eviware.x.dialogs.XFileDialogs;
 import org.junit.After;
 import org.junit.Before;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.when;
 
-/**
- * Created with IntelliJ IDEA.
- * User: manne
- * Date: 2/17/14
- * Time: 10:10 AM
- * To change this template use File | Settings | File Templates.
- */
 public class StubbedDialogsTestBase {
-    protected File savedFile;
+    private File savedFile;
 
-    protected StubbedDialogs stubbedDialogs;
-    private XDialogs originalDialogs;
+    protected StubbedDialogs stubbedDialogs = new StubbedDialogs();
 
     @Mock
     protected XFileDialogs mockedFileDialogs;
+    private XDialogs originalDialogs;
+
     private XFileDialogs originalFileDialogs;
 
 
     @Before
-    public void resetDialogs() throws IOException {
+    public void setupStubbedDialogs() throws IOException {
         MockitoAnnotations.initMocks(this);
 
-        savedFile = File.createTempFile("saved-project-file", "xml");
+        addSaveAsBehaviour(mockedFileDialogs);
+        setMockedDialogsTemporary();
+    }
 
+    @After
+    public void teardownStubbedDialogs() {
+        restoreOriginalDialogs();
+    }
+
+
+    private void addSaveAsBehaviour(XFileDialogs mockedFileDialogs) throws IOException {
+        savedFile = File.createTempFile("saved-project-file", ".xml");
+        when(mockedFileDialogs.saveAs(anyObject(), anyString(), anyString(), anyString(), isA(File.class))).thenReturn(savedFile);
+    }
+
+    private void setMockedDialogsTemporary() {
         originalDialogs = UISupport.getDialogs();
         originalFileDialogs = UISupport.getFileDialogs();
-
-        stubbedDialogs = new StubbedDialogs();
-
-        when(mockedFileDialogs.saveAs(anyObject(), anyString(), anyString(), anyString(), isA(File.class))).thenReturn(savedFile);
-
         UISupport.setDialogs(stubbedDialogs);
         UISupport.setFileDialogs(mockedFileDialogs);
     }
 
-    @After
-    public void restoreDialogs() {
+    private void restoreOriginalDialogs() {
         UISupport.setDialogs(originalDialogs);
         UISupport.setFileDialogs(originalFileDialogs);
     }
