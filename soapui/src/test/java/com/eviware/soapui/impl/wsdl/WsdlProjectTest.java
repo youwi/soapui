@@ -1,129 +1,223 @@
 /*
- * Copyright 2004-2014 SmartBear Software
+/*
+ *  SoapUI, copyright (C) 2004-2012 smartbear.com
  *
- * Licensed under the EUPL, Version 1.1 or - as soon as they will be approved by the European Commission - subsequent
- * versions of the EUPL (the "Licence");
- * You may not use this work except in compliance with the Licence.
- * You may obtain a copy of the Licence at:
+ *  SoapUI is free software; you can redistribute it and/or modify it under the
+ *  terms of version 2.1 of the GNU Lesser General Public License as published by 
+ *  the Free Software Foundation.
  *
- * http://ec.europa.eu/idabc/eupl
- *
- * Unless required by applicable law or agreed to in writing, software distributed under the Licence is
- * distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the Licence for the specific language governing permissions and limitations
- * under the Licence.
-*/
+ *  SoapUI is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+ *  even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ *  See the GNU Lesser General Public License for more details at gnu.org.
+ */
+
 package com.eviware.soapui.impl.wsdl;
 
-import com.eviware.soapui.SoapUI;
-import com.eviware.soapui.impl.rest.RestRequest;
-import com.eviware.soapui.impl.rest.RestRequestInterface;
-import com.eviware.soapui.impl.rest.mock.RestMockAction;
-import com.eviware.soapui.impl.rest.mock.RestMockResponse;
-import com.eviware.soapui.impl.rest.mock.RestMockService;
-import com.eviware.soapui.model.mock.MockService;
+import com.eviware.soapui.model.project.SaveStatus;
+import com.eviware.soapui.settings.UISettings;
 import com.eviware.soapui.support.SoapUIException;
-import com.eviware.soapui.utils.ModelItemFactory;
+import com.eviware.soapui.support.UISupport;
+import com.eviware.soapui.utils.StubbedDialogs;
+import com.eviware.x.dialogs.XDialogs;
+import com.eviware.x.dialogs.XFileDialogs;
+import org.apache.xmlbeans.XmlException;
+import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
+import java.io.IOException;
 
-import static com.eviware.soapui.impl.rest.RestRequestInterface.HttpMethod.GET;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.CoreMatchers.nullValue;
+import static com.eviware.soapui.utils.StubbedDialogs.hasConfirmationWithQuestion;
+import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+@Ignore
+//These tests seem to be unfinished. Re-ignoring.
 public class WsdlProjectTest {
-    private final String restMockResponseContent = "Some response";
-    private WsdlProject project;
-    private final String restMockServiceName = "Another Great Wow";
-    private final String restMockResponseName = "Teh Response";
+    private static final String PROJECT_NAME = "ProjectName";
+    private static final String FILE_NAME = "thefile.xml";
+    private static final String TEMPORARY_FOLDER_PATH = new File(System.getProperty("java.io.tmpdir")).getPath();
+
+    private XFileDialogs originalFileDialogs;
+    private XFileDialogs fileDialogs;
+    private XDialogs originalDialogs;
+    private StubbedDialogs dialogs;
+
+    private File file;
 
     @Before
-    public void setUp() throws Exception {
-        String fileName = SoapUI.class.getResource("/soapui-projects/BasicMock-soapui-4.6.3-Project.xml").toURI().toString();
-        project = new WsdlProject(fileName);
+    public void setup() {
+        originalFileDialogs = UISupport.getFileDialogs();
+        originalDialogs = UISupport.getDialogs();
+
+        fileDialogs = mock(XFileDialogs.class);
+        UISupport.setFileDialogs(fileDialogs);
+
+        dialogs = new StubbedDialogs();
+        UISupport.setDialogs(dialogs);
     }
 
     @Test
-    public void shouldSaveAndReloadRestMockServices() throws Exception {
-        String expectedName = "Teh Awesome Mock Service";
-        project.addNewRestMockService(expectedName);
+    public void saveIsConsideredSuccessfulIfProjectIsClosed() throws XmlException, IOException, SoapUIException {
+        WsdlProject project = createWsdlProject(false, false);
+        SaveStatus saved = project.save();
 
-        WsdlProject reloadedProject = saveAndReloadProject(project);
-
-        RestMockService restMockService = reloadedProject.getRestMockServiceByName(expectedName);
-        assertThat(restMockService, notNullValue());
-        assertThat(restMockService.getName(), is(expectedName));
+        assertThat(saved, equalTo(SaveStatus.SUCCESS));
     }
 
     @Test
-    public void shouldSaveAndReloadRestMockResponses() throws Exception {
-        addRestMockResponseToProject();
+    public void projectIsNotSavedIfSaveAsDialogIsCancelled() throws IOException {
+        saveAsDialogShouldReturn(null);
 
-        WsdlProject reloadedProject = saveAndReloadProject(project);
+        WsdlProject project = createWsdlProject(true, false);
+        SaveStatus saveResult = project.save();
 
-        RestMockService reloadedMockService = reloadedProject.getRestMockServiceByName(restMockServiceName);
-        RestMockResponse reloadedMockResponse = reloadedMockService.getMockOperationAt(0).getMockResponseAt(0);
-        assertThat(reloadedMockResponse, notNullValue());
-        assertThat(reloadedMockResponse.getName(), is(restMockResponseName));
-        assertThat(reloadedMockResponse.getResponseContent(), is(restMockResponseContent));
+        assertThat(project.getPath(), is(nullValue()));
+        assertThat(saveResult, equalTo(SaveStatus.CANCELLED));
     }
 
     @Test
-    public void shouldRemoveMockServices() throws Exception {
-        int mockServiceCountBefore = project.getMockServiceCount();
-        MockService mocka = project.addNewMockService("Mocka");
-        assertThat(project.getMockServiceCount(), is(mockServiceCountBefore + 1));
+    public void projectIsSavedIfWritableFileSelected() throws IOException {
+        file = FileBuilder.file().canWrite(true).build();
+        saveAsDialogShouldReturn(file);
 
-        project.removeMockService(mocka);
-        assertThat(project.getMockServiceCount(), is(mockServiceCountBefore));
-        assertThat(project.getMockServiceByName("Mocka"), nullValue());
+        WsdlProject project = createWsdlProject(true, false);
+        SaveStatus saveResult = project.save();
+
+        assertThat(project.getPath(), equalTo(TEMPORARY_FOLDER_PATH));
+        assertThat(saveResult, equalTo(SaveStatus.SUCCESS));
     }
 
     @Test
-    public void shouldRemoveRestMockServices() throws Exception {
-        int restMockServiceCountBefore = project.getRestMockServiceCount();
-        MockService mocka = project.addNewRestMockService("Mocka");
-        assertThat(project.getRestMockServiceCount(), is(restMockServiceCountBefore + 1));
+    public void confirmIfTryingToOverwriteExistingFile() throws IOException {
+        dialogs.mockConfirmWithReturnValue(true);
+        file = FileBuilder.file().canWrite(false, true).exists(true).build();
 
-        project.removeMockService(mocka);
-        assertThat(project.getRestMockServiceCount(), is(restMockServiceCountBefore));
-        assertThat(project.getRestMockServiceByName("Mocka"), nullValue());
+        saveAsDialogShouldReturn(file);
+
+        WsdlProject project = createWsdlProject(true, false);
+        SaveStatus saveStatus = project.save();
+
+        assertThat(dialogs.getConfirmations(), hasConfirmationWithQuestion("File [" + FILE_NAME + "] exists, overwrite?"));
+        assertThat(saveStatus, equalTo(SaveStatus.SUCCESS));
     }
 
     @Test
-    public void shouldNotResortMockOperationsOnReload() throws Exception {
-        RestMockService restMockService = project.addNewRestMockService("x");
-        restMockService.addEmptyMockAction(RestRequestInterface.HttpMethod.GET, "b");
-        restMockService.addEmptyMockAction(RestRequestInterface.HttpMethod.GET, "a");
+    public void cancelSaveOfExistingFileIfNotWritableAndNoNewFileSelected() throws IOException {
+        dialogs.mockConfirmWithReturnValue(true);
+        file = FileBuilder.file().canWrite(false).exists(true).build();
+        saveAsDialogShouldReturn(null);
 
-        WsdlProject reloadedProject = saveAndReloadProject(project);
+        WsdlProject project = createWsdlProject(true, true);
 
-        RestMockService mockServiceX = reloadedProject.getRestMockServiceByName("x");
-
-        assertThat(mockServiceX.getMockOperationAt(0).getName(), is("b"));
-        assertThat(mockServiceX.getMockOperationAt(1).getName(), is("a"));
+        SaveStatus saveResult = project.save();
+        assertThat(saveResult, equalTo(SaveStatus.CANCELLED));
     }
 
-    private void addRestMockResponseToProject() throws SoapUIException {
-        RestMockService restMockService = project.addNewRestMockService(restMockServiceName);
-        RestRequest restRequest = ModelItemFactory.makeRestRequest();
-        restRequest.setMethod(GET);
-        restRequest.setName("REST Mock Action");
-        restRequest.setPath("Resource/path/subpath");
-        RestMockAction restMockAction = restMockService.addNewMockAction(restRequest);
-        RestMockResponse mockResponse = restMockAction.addNewMockResponse("Response 1");
-        mockResponse.setResponseContent(restMockResponseContent);
-        mockResponse.setName(restMockResponseName);
+    @Test
+    public void doNotSaveExistingFileIfNotWritableAndWeDontWantToSave() throws IOException {
+        dialogs.mockConfirmWithReturnValue(false);
+        file = FileBuilder.file().canWrite(false).exists(true).build();
+
+        WsdlProject project = createWsdlProject(true, true);
+        SaveStatus saveResult = project.save();
+
+        assertThat(saveResult, equalTo(SaveStatus.DONT_SAVE));
     }
 
-    protected WsdlProject saveAndReloadProject(WsdlProject project) throws Exception {
-        File tempFile = File.createTempFile("soapuitemptestfile", ".xml");
-        tempFile.deleteOnExit();
-        project.saveIn(tempFile);
-        return new WsdlProject(tempFile.toURI().toString());
+    @Test
+    public void askForNewFileNameIfSelectedFileIsNotWritable() throws IOException {
+        dialogs.mockConfirmWithReturnValue(true);
+        file = FileBuilder.file().canWrite(false, true).exists(true).build();
+        saveAsDialogShouldReturn(file);
+
+        WsdlProject project = createWsdlProject(true, false);
+        SaveStatus saveResult = project.save();
+
+        assertThat(saveResult, equalTo(SaveStatus.SUCCESS));
+        assertThat(dialogs.getConfirmations(), hasConfirmationWithQuestion("Project file [" + TEMPORARY_FOLDER_PATH + "] can not be written to, save to new file?"));
+    }
+
+    @Test
+    public void shouldBePossibleToCancelIfFileIsNotWritable() throws IOException {
+        // cancel "save to new file?" dialog
+        dialogs.mockConfirmWithReturnValue(null);
+        file = FileBuilder.file().canWrite(false).exists(true).build();
+        saveAsDialogShouldReturn(file);
+
+        WsdlProject project = createWsdlProject(true, true);
+        SaveStatus saveResult = project.save();
+
+        assertThat(dialogs.getConfirmations(), hasConfirmationWithQuestion("Project file [" + TEMPORARY_FOLDER_PATH + "] can not be written to, save to new file?"));
+        assertThat(saveResult, equalTo(SaveStatus.CANCELLED));
+    }
+
+    private WsdlProject createWsdlProject(boolean isOpen, boolean exitingProject) {
+        WsdlProject wsdlProject = new WsdlProject(null, null, isOpen, PROJECT_NAME, null) {
+            @Override
+            public SaveStatus saveIn(File projectFile) throws IOException {
+                // always return success for the actual save step
+                return SaveStatus.SUCCESS;
+            }
+
+            // TODO This yields compilation error since we're not longer in the same package
+            /*@Override
+			public File createFile( String path )
+			{
+				return file;
+			}*/
+        };
+        wsdlProject.getSettings().setBoolean(UISettings.LINEBREAK, false);
+		/*if( exitingProject )
+		{
+		// TODO This yields compilation error since we're not longer in the same package and
+		// you don't want to make the path field public
+			wsdlProject.path = TEMPORARY_FOLDER_PATH;
+		}*/
+        return wsdlProject;
+    }
+
+    @After
+    public void teardown() {
+        UISupport.setFileDialogs(originalFileDialogs);
+        UISupport.setDialogs(originalDialogs);
+    }
+
+    static class FileBuilder {
+
+        private File file = mock(File.class);
+
+        private FileBuilder() {
+        }
+
+        static FileBuilder file() {
+            return new FileBuilder();
+        }
+
+        FileBuilder canWrite(Boolean firstInvocation, Boolean... comingInvocations) {
+            when(file.canWrite()).thenReturn(firstInvocation, comingInvocations);
+            return this;
+        }
+
+        FileBuilder exists(boolean exists) {
+            when(file.exists()).thenReturn(exists);
+            return this;
+        }
+
+        File build() {
+            when(file.getAbsolutePath()).thenReturn(TEMPORARY_FOLDER_PATH);
+            when(file.getName()).thenReturn(FILE_NAME);
+            return file;
+        }
+
+    }
+
+    private void saveAsDialogShouldReturn(File file, File... files) {
+        // TODO The isA() method should be imported from the latest Hamcrest lib
+        //when( fileDialogs.saveAs( anyObject(), anyString(), anyString(), anyString(), isA( File.class ) ) ).thenReturn( file, files );
     }
 }
