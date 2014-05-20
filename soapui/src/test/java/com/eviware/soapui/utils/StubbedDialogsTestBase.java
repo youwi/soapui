@@ -32,7 +32,7 @@ import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.when;
 
 /**
- * This class provides as base for mocking out dialogs in SoapUI when doing unit testing.
+ * This class provides a base for mocking out dialogs in SoapUI when doing unit testing.
  * The dialogs will be replaced by <i>StubbedDialogs</i> and the file dialogs with a mock that
  * returns a new <i>File</i> object when the <i>saveAs()</i> method is called
  *
@@ -42,25 +42,24 @@ public abstract class StubbedDialogsTestBase {
     private static final String SAVED_PROJECT_FILE_NAME = "saved-project-file";
     private static final String SAVED_PROJECT_FILE_EXTENSION = ".xml";
 
-    protected final StubbedDialogs stubbedDialogs = new StubbedDialogs();
-
+    protected StubbedDialogs stubbedDialogs;
     @Mock
     protected XFileDialogs mockedFileDialogs;
+
     private XDialogs originalDialogs;
-
     private XFileDialogs originalFileDialogs;
-
 
     @Before
     public void setupStubbedDialogs() throws IOException {
         MockitoAnnotations.initMocks(this);
-
+        // These need to be reset each time to support the
+        stubbedDialogs = new StubbedDialogs();
         addSaveAsBehaviour(mockedFileDialogs);
         setMockedDialogsTemporary();
     }
 
     @After
-    public void tearDownStubbedDialogs() {
+    public void teardownStubbedDialogs() {
         restoreOriginalDialogs();
     }
 
